@@ -1,0 +1,238 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<style>
+  * { box-sizing: border-box; }
+  body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; margin: 0; padding: 16px; background: #f5f5f7; color: #1d1d1f; }
+  .card { background: #fff; border-radius: 16px; padding: 16px; margin-bottom: 12px; box-shadow: 0 1px 4px rgba(0,0,0,0.08); }
+  h2 { margin: 0 0 4px; font-size: 16px; }
+  .sub { font-size: 12px; color: #888; margin: 0 0 14px; }
+  label { font-size: 12px; color: #555; display: block; margin-bottom: 4px; }
+  input[type=range] { width: 100%; accent-color: #0071e3; }
+  .grid3 { display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px; }
+  .drop { border: 2px dashed #ccc; border-radius: 14px; padding: 28px 16px; text-align: center; cursor: pointer; transition: background 0.15s; position: relative; }
+  .drop:active { background: #e8f0fe; }
+  .drop input[type=file] { position: absolute; inset: 0; opacity: 0; width: 100%; height: 100%; cursor: pointer; }
+  .drop-icon { font-size: 28px; margin-bottom: 6px; }
+  .drop-title { font-size: 14px; font-weight: 600; margin-bottom: 4px; }
+  .drop-sub { font-size: 12px; color: #888; }
+  .paste-btn { width: 100%; padding: 11px; background: #f0f4ff; color: #0071e3; border: 1.5px dashed #0071e3; border-radius: 12px; font-size: 13px; font-weight: 500; cursor: pointer; margin-top: 8px; }
+  .file-row { display: flex; justify-content: space-between; align-items: center; padding: 9px 0; border-bottom: 1px solid #f0f0f0; font-size: 13px; }
+  .file-name { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; max-width: 60%; }
+  .file-size { color: #888; font-size: 12px; }
+  .del { cursor: pointer; color: #aaa; font-size: 18px; padding: 0 4px; }
+  .run-btn { width: 100%; padding: 13px; background: #0071e3; color: #fff; border: none; border-radius: 12px; font-size: 14px; font-weight: 600; cursor: pointer; }
+  .run-btn:disabled { background: #ccc; cursor: default; }
+  .summary { background: #e8f8ef; border-radius: 12px; padding: 12px 14px; display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px; }
+  .summary-label { font-size: 12px; color: #34a853; margin-bottom: 2px; }
+  .summary-text { font-size: 14px; font-weight: 600; }
+  .dl-all { background: #fff; border: 1.5px solid #34a853; color: #34a853; padding: 6px 14px; border-radius: 8px; font-size: 13px; cursor: pointer; }
+  .res-row { display: flex; justify-content: space-between; align-items: center; padding: 10px 0; border-bottom: 1px solid #f0f0f0; flex-wrap: wrap; gap: 6px; }
+  .res-name { font-size: 13px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; max-width: 42%; }
+  .res-meta { display: flex; align-items: center; gap: 7px; flex-wrap: wrap; }
+  .badge { font-size: 11px; padding: 2px 7px; background: #e8f8ef; color: #34a853; border-radius: 6px; }
+  .save-btn { font-size: 12px; padding: 4px 12px; background: #f5f5f7; border: 1px solid #ddd; border-radius: 8px; cursor: pointer; }
+  .hidden { display: none; }
+  .tag { font-size: 11px; color: #aaa; }
+</style>
+</head>
+<body>
+
+<div class="card">
+  <h2>📸 사진 일괄 압축기</h2>
+  <p class="sub">여러 장을 한 번에 — 브라우저에서 바로 처리</p>
+
+  <div class="grid3">
+    <div>
+      <label>품질 <strong id="q-val">80%</strong></label>
+      <input type="range" id="quality" min="10" max="100" step="5" value="80">
+    </div>
+    <div>
+      <label>최대 가로 <strong id="mw-val">1920px</strong></label>
+      <input type="range" id="maxW" min="320" max="4096" step="64" value="1920">
+    </div>
+    <div>
+      <label>최대 세로 <strong id="mh-val">1920px</strong></label>
+      <input type="range" id="maxH" min="320" max="4096" step="64" value="1920">
+    </div>
+  </div>
+</div>
+
+<div class="card">
+  <div class="drop" id="dropzone">
+    <input type="file" id="fileinput" accept="image/*" multiple>
+    <div class="drop-icon">📂</div>
+    <div class="drop-title">탭해서 사진 선택 또는 드래그</div>
+    <div class="drop-sub">JPG · PNG · WEBP · 여러 장 동시 선택 가능</div>
+  </div>
+  <button class="paste-btn" id="paste-btn">📋 클립보드에서 붙여넣기 (모바일)</button>
+</div>
+
+<div class="card hidden" id="filelist">
+  <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;">
+    <span id="file-count" style="font-size:12px;color:#888;"></span>
+    <span id="clear-btn" style="font-size:12px;color:#888;cursor:pointer;">전체 제거</span>
+  </div>
+  <div id="file-items"></div>
+</div>
+
+<div class="card hidden" id="run-wrap">
+  <button class="run-btn" id="run-btn">압축 시작</button>
+</div>
+
+<div class="card hidden" id="results">
+  <div class="summary">
+    <div>
+      <div class="summary-label">압축 완료</div>
+      <div class="summary-text" id="summary-text"></div>
+    </div>
+    <button class="dl-all" id="dl-all">전체 저장</button>
+  </div>
+  <div id="result-items"></div>
+</div>
+
+<script>
+const fmt = b => b < 1048576 ? (b/1024).toFixed(1)+'KB' : (b/1048576).toFixed(2)+'MB';
+let files = [], resultData = [];
+
+document.getElementById('quality').oninput = e => document.getElementById('q-val').textContent = e.target.value+'%';
+document.getElementById('maxW').oninput = e => document.getElementById('mw-val').textContent = e.target.value+'px';
+document.getElementById('maxH').oninput = e => document.getElementById('mh-val').textContent = e.target.value+'px';
+
+// 파일 선택
+document.getElementById('fileinput').onchange = e => addFiles(e.target.files);
+
+// 드래그앤드롭
+const dz = document.getElementById('dropzone');
+dz.ondragover = e => { e.preventDefault(); dz.style.background='#e8f0fe'; };
+dz.ondragleave = () => dz.style.background='';
+dz.ondrop = e => { e.preventDefault(); dz.style.background=''; addFiles(e.dataTransfer.files); };
+
+// 클립보드 붙여넣기 (모바일 대응)
+document.getElementById('paste-btn').onclick = async () => {
+  try {
+    const items = await navigator.clipboard.read();
+    const imgs = [];
+    for (const item of items) {
+      for (const type of item.types) {
+        if (type.startsWith('image/')) {
+          const blob = await item.getType(type);
+          const ext = type.split('/')[1] || 'jpg';
+          imgs.push(new File([blob], `clipboard_${Date.now()}.${ext}`, { type }));
+        }
+      }
+    }
+    if (imgs.length) addFiles(imgs);
+    else alert('클립보드에 이미지가 없어요.\n사진을 길게 눌러 복사한 후 다시 시도해보세요.');
+  } catch {
+    alert('클립보드 접근 권한이 필요해요.\n브라우저 설정에서 허용해주세요.');
+  }
+};
+
+// 전역 paste 이벤트도 대응
+document.addEventListener('paste', e => {
+  const imgs = Array.from(e.clipboardData?.items || [])
+    .filter(i => i.type.startsWith('image/'))
+    .map(i => i.getAsFile());
+  if (imgs.length) addFiles(imgs);
+});
+
+function addFiles(newFiles) {
+  const imgs = Array.from(newFiles).filter(f => f && f.type.startsWith('image/'));
+  files = [...files, ...imgs];
+  render();
+}
+
+function render() {
+  const fl = document.getElementById('filelist');
+  const rw = document.getElementById('run-wrap');
+  if (!files.length) { fl.classList.add('hidden'); rw.classList.add('hidden'); return; }
+  fl.classList.remove('hidden'); rw.classList.remove('hidden');
+  document.getElementById('file-count').textContent = '선택된 파일 ' + files.length + '장';
+  document.getElementById('run-btn').textContent = files.length + '장 일괄 압축 시작';
+  document.getElementById('file-items').innerHTML = files.map((f, i) => `
+    <div class="file-row">
+      <span class="file-name">${f.name}</span>
+      <div style="display:flex;align-items:center;gap:10px;">
+        <span class="file-size">${fmt(f.size)}</span>
+        <span class="del" data-i="${i}">×</span>
+      </div>
+    </div>`).join('');
+  document.querySelectorAll('.del').forEach(el =>
+    el.onclick = () => { files.splice(+el.dataset.i, 1); render(); document.getElementById('results').classList.add('hidden'); });
+}
+
+document.getElementById('clear-btn').onclick = () => { files=[]; render(); document.getElementById('results').classList.add('hidden'); };
+
+function compress(file, q, mw, mh) {
+  return new Promise(res => {
+    const img = new Image(), url = URL.createObjectURL(file);
+    img.onload = () => {
+      let {width:w, height:h} = img;
+      const r = Math.min(mw/w, mh/h, 1);
+      w = Math.round(w*r); h = Math.round(h*r);
+      const c = document.createElement('canvas');
+      c.width=w; c.height=h;
+      c.getContext('2d').drawImage(img, 0, 0, w, h);
+      c.toBlob(blob => { URL.revokeObjectURL(url); res({blob,w,h}); },
+        file.type==='image/png' ? 'image/png' : 'image/jpeg', q/100);
+    };
+    img.src = url;
+  });
+}
+
+document.getElementById('run-btn').onclick = async () => {
+  const btn = document.getElementById('run-btn');
+  btn.disabled=true; btn.textContent='처리 중...';
+  document.getElementById('results').classList.add('hidden');
+  resultData = [];
+  const q=+document.getElementById('quality').value;
+  const mw=+document.getElementById('maxW').value;
+  const mh=+document.getElementById('maxH').value;
+  for (const f of files) {
+    const {blob,w,h} = await compress(f,q,mw,mh);
+    resultData.push({name:f.name, orig:f.size, newSize:blob.size, w, h, url:URL.createObjectURL(blob)});
+  }
+  renderResults();
+  btn.disabled=false; btn.textContent=files.length+'장 일괄 압축 시작';
+};
+
+function renderResults() {
+  const totO = resultData.reduce((a,r)=>a+r.orig,0);
+  const totN = resultData.reduce((a,r)=>a+r.newSize,0);
+  const pct = Math.round((totO-totN)/totO*100);
+  document.getElementById('summary-text').textContent = `${fmt(totO)} → ${fmt(totN)} (${pct}% 절약)`;
+  document.getElementById('result-items').innerHTML = resultData.map((r,i) => {
+    const p = Math.round((r.orig-r.newSize)/r.orig*100);
+    return `<div class="res-row">
+      <span class="res-name">${r.name}</span>
+      <div class="res-meta">
+        <span class="tag">${fmt(r.orig)}</span>
+        <span class="tag">→</span>
+        <span style="font-size:12px;color:#0071e3;">${fmt(r.newSize)}</span>
+        <span class="badge">-${p}%</span>
+        <span class="tag">${r.w}×${r.h}</span>
+        <button class="save-btn" data-i="${i}">저장</button>
+      </div>
+    </div>`;
+  }).join('');
+  document.querySelectorAll('.save-btn').forEach(btn => {
+    btn.onclick = () => {
+      const r = resultData[+btn.dataset.i];
+      const a = document.createElement('a'); a.href=r.url;
+      const base=r.name.replace(/\.[^/.]+$/,''), ext=r.name.split('.').pop();
+      a.download=`${base}_compressed.${ext}`; a.click();
+    };
+  });
+  document.getElementById('dl-all').onclick = () => resultData.forEach(r => {
+    const a=document.createElement('a'); a.href=r.url;
+    const base=r.name.replace(/\.[^/.]+$/,''), ext=r.name.split('.').pop();
+    a.download=`${base}_compressed.${ext}`; a.click();
+  });
+  document.getElementById('results').classList.remove('hidden');
+}
+</script>
+</body>
+</html>
